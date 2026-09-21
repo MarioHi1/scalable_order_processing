@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ScalableOrderProcessing.Tests/ScalableOrderProcessing.Tests.csproj" />
+  <Project Path="ScalableOrderProcessing/ScalableOrderProcessing.csproj" />
+</Solution>

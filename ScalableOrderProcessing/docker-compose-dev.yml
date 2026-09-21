@@ -1,0 +1,26 @@
+name: scalableOrderProcessingDev
+services:
+  orders-db:
+    image: postgres:16
+    container_name: orders-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orders
+    ports:
+      - "5434:5432"
+    volumes:
+      # Data survives container restarts (docker compose down / up)
+      - orders-db-data:/var/lib/postgresql/data
+      # Scripts in here run automatically ONLY on the very first start
+      # (when the data directory is still empty)
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orders"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  orders-db-data:
