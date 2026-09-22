@@ -117,26 +117,24 @@ public class Worker : BackgroundService
 
     private async Task DispatchLoopAsync(CancellationToken ct)
     {
-        // Order that was already read from the queue but is still waiting for a free slot
-        Order? pending = null;
-
         try
         {
-            await foreach (var order in _queue.Reader.ReadAllAsync(ct))
+            while (await _queue.Reader.WaitToReadAsync(ct))
             {
-                pending = order;
+                // Take the slot first and only then read: the order stays in the queue until it can
+                // start, so the poll loop never fetches more than MaxQueueSize waiting orders
                 await _semaphore.WaitAsync(ct);
-                pending = null;
+
+                if (!_queue.Reader.TryRead(out var order))
+                {
+                    _semaphore.Release();
+                    continue;
+                }
+
                 _logger.LogInformation("Active workers: {ActiveWorkers}/{MaxParallelJobs}", _options.MaxParallelJobs - _semaphore.CurrentCount, _options.MaxParallelJobs);
 
                 _ = ProcessOrderAsync(order, ct);
             }
-        }
-        catch (OperationCanceledException) when (pending is not null)
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
-            await repo.ResetToOpenAsync(pending.Id, CancellationToken.None);
         }
         catch (OperationCanceledException)
         {

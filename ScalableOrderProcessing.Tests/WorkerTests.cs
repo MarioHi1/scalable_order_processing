@@ -115,31 +115,56 @@ public class WorkerTests
         await worker.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Locks_at_most_MaxParallelJobs_plus_MaxQueueSize_orders()
+    {
+        var time = new FakeTimeProvider();
+        var repo = new FakeOrderRepository(1, 2, 3, 4, 5, 6, 7, 8);
+        var api = new FakeApiClient((_, ct) => Task.Delay(Timeout.Infinite, ct));
+        var worker = CreateWorker(repo, api, time, maxParallelJobs: 1, maxQueueSize: 2);
+
+        await worker.StartAsync(CancellationToken.None);
+        await WaitUntil(() => api.Started == 1);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await Task.Delay(100);
+            time.Advance(TimeSpan.FromSeconds(10));
+        }
+        await Task.Delay(100);
+
+        Assert.Equal(3, repo.Status.Values.Count(s => s == "InProgress"));
+
+        await worker.StopAsync(CancellationToken.None);
+    }
+
     private static Worker CreateWorker(
         IOrderRepository repo,
         IMockApiClient api,
         TimeProvider time,
         int maxParallelJobs,
-        int jobTimeoutMinutes = 5)
+        int jobTimeoutMinutes = 5,
+        int maxQueueSize = 20)
     {
         var services = new ServiceCollection()
             .AddSingleton(repo)
             .AddSingleton(api)
             .BuildServiceProvider();
 
-        return CreateWorker(services, time, maxParallelJobs, jobTimeoutMinutes);
+        return CreateWorker(services, time, maxParallelJobs, jobTimeoutMinutes, maxQueueSize);
     }
 
     private static Worker CreateWorker(
         IServiceProvider services,
         TimeProvider time,
         int maxParallelJobs,
-        int jobTimeoutMinutes = 5)
+        int jobTimeoutMinutes = 5,
+        int maxQueueSize = 20)
     {
         var options = Options.Create(new WorkerOptions
         {
             PollIntervalSeconds = 10,
-            MaxQueueSize = 20,
+            MaxQueueSize = maxQueueSize,
             MaxParallelJobs = maxParallelJobs,
             JobTimeoutMinutes = jobTimeoutMinutes,
         });
