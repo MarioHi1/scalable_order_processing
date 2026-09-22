@@ -8,3 +8,5 @@ There is no retry limit for orders. A failing order is reset to Open and tried a
 If an instance stops suddenly, its orders stay on InProgress forever. A cleanup job could reset old InProgress orders back to Open.
 
 A possible extension: give each order a function id. Each function id runs a different function, so the worker can handle different kinds of jobs.
+
+Parallel operation of several instances is not tested yet. A kind of fuzz testing could cover it: start several instances against the same database with random settings (MaxParallelJobs, MaxQueueSize, PollIntervalSeconds), random API delays and errors, and stop or kill instances at random times. Afterwards check that every order was processed exactly once and that no order is stuck on InProgress.
