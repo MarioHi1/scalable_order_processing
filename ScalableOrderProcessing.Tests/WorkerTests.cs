@@ -94,6 +94,37 @@ public class WorkerTests
     }
 
     [Fact]
+    public async Task Marks_order_as_Failed_when_the_api_throws()
+    {
+        var repo = new FakeOrderRepository(1, 2);
+        var api = new FakeApiClient((order, _) =>
+            order.Id == 1 ? throw new InvalidOperationException("API call failed") : Task.CompletedTask);
+        var worker = CreateWorker(repo, api, new FakeTimeProvider(), maxParallelJobs: 1);
+
+        await worker.StartAsync(CancellationToken.None);
+
+        await WaitUntil(() => repo.Status.GetValueOrDefault(2) == "Completed");
+        Assert.Equal("Failed", repo.Status[1]);
+
+        await worker.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Marks_order_as_Failed_when_the_api_is_cancelled_by_something_else()
+    {
+        // HttpClient.Timeout surfaces as a TaskCanceledException that is not tied to our tokens
+        var repo = new FakeOrderRepository(1);
+        var api = new FakeApiClient((_, _) => throw new TaskCanceledException("HttpClient.Timeout"));
+        var worker = CreateWorker(repo, api, new FakeTimeProvider(), maxParallelJobs: 1);
+
+        await worker.StartAsync(CancellationToken.None);
+
+        await WaitUntil(() => repo.Status.GetValueOrDefault(1) == "Failed");
+
+        await worker.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Releases_the_worker_slot_when_the_job_setup_throws()
     {
         var resolutions = 0;

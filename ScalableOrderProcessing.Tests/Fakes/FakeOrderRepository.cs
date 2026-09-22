@@ -39,6 +39,7 @@ public class FakeOrderRepository : IOrderRepository
 
     public Task MarkCompletedAsync(long id, CancellationToken ct) => Set(id, "Completed");
     public Task MarkTimeoutAsync(long id, CancellationToken ct) => Set(id, "Timeout");
+    public Task MarkFailedAsync(long id, CancellationToken ct) => Set(id, "Failed");
     public Task ResetToOpenAsync(long id, CancellationToken ct)
     {
         Started.TryRemove(id, out _);

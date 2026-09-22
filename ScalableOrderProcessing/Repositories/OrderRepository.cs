@@ -86,6 +86,14 @@ public class OrderRepository : IOrderRepository
         _logger.LogWarning("Order {OrderId} timed out", id);
     }
 
+    public async Task MarkFailedAsync(long id, CancellationToken ct)
+    {
+        const string sql = "UPDATE orders SET status = 'Failed', finished_at = NOW() WHERE id = $1";
+        await using var cmd = _dataSource.CreateCommand(sql);
+        cmd.Parameters.AddWithValue(id);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     public async Task ResetToOpenAsync(long id, CancellationToken ct)
     {
         const string sql = "UPDATE orders SET status = 'Open', started_at = NULL WHERE id = $1";

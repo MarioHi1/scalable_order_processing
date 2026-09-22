@@ -8,5 +8,6 @@ public interface IOrderRepository
     Task MarkStartedAsync(long id, CancellationToken ct);
     Task MarkCompletedAsync(long id, CancellationToken ct);
     Task MarkTimeoutAsync(long id, CancellationToken ct);
+    Task MarkFailedAsync(long id, CancellationToken ct);
     Task ResetToOpenAsync(long id, CancellationToken ct);
 }

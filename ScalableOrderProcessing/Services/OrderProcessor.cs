@@ -47,5 +47,11 @@ public class OrderProcessor : IOrderProcessor
         {
             await _repo.ResetToOpenAsync(order.Id, CancellationToken.None);
         }
+        catch (Exception ex)
+        {
+            // Also catches cancellations that are neither our timeout nor the shutdown, e.g. HttpClient.Timeout
+            _logger.LogError(ex, "Order {OrderId} failed", order.Id);
+            await _repo.MarkFailedAsync(order.Id, CancellationToken.None);
+        }
     }
 }
