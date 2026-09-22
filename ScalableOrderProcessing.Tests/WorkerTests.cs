@@ -103,8 +103,7 @@ public class WorkerTests
             .AddSingleton<IOrderRepository>(repo)
             .AddScoped<IMockApiClient>(_ => Interlocked.Increment(ref resolutions) == 1
                 ? throw new InvalidOperationException("setup failed")
-                : api)
-            .BuildServiceProvider();
+                : api);
         var worker = CreateWorker(services, new FakeTimeProvider(), maxParallelJobs: 1);
 
         await worker.StartAsync(CancellationToken.None);
@@ -148,14 +147,13 @@ public class WorkerTests
     {
         var services = new ServiceCollection()
             .AddSingleton(repo)
-            .AddSingleton(api)
-            .BuildServiceProvider();
+            .AddSingleton(api);
 
         return CreateWorker(services, time, maxParallelJobs, jobTimeoutMinutes, maxQueueSize);
     }
 
     private static Worker CreateWorker(
-        IServiceProvider services,
+        IServiceCollection services,
         TimeProvider time,
         int maxParallelJobs,
         int jobTimeoutMinutes = 5,
@@ -169,9 +167,16 @@ public class WorkerTests
             JobTimeoutMinutes = jobTimeoutMinutes,
         });
 
+        var provider = services
+            .AddLogging()
+            .AddSingleton(options)
+            .AddSingleton(time)
+            .AddScoped<IOrderProcessor, OrderProcessor>()
+            .BuildServiceProvider();
+
         return new Worker(
             NullLogger<Worker>.Instance,
-            services.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<IServiceScopeFactory>(),
             options,
             time);
     }

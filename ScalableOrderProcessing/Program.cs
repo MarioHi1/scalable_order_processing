@@ -10,6 +10,7 @@ var connectionString = builder.Configuration.GetConnectionString("Postgres")
 
 builder.Services.AddNpgsqlDataSource(connectionString);
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IOrderProcessor, OrderProcessor>();
 builder.Services.AddHttpClient<IMockApiClient, MockApiClient>(client =>
 {
     client.BaseAddress = new Uri("https://mockapi-ms5j.onrender.com/");

@@ -155,34 +155,15 @@ public class Worker : BackgroundService
 
     private async Task ProcessOrderAsync(Order order, CancellationToken serviceStoppingToken)
     {
-        // Every log of this job, including the ones in the repository and the API client, carries the OrderId
+        // Every log of this job, including the ones in the processor, the repository and the API client, carries the OrderId
         using var logScope = _logger.BeginScope("Order {OrderId}", order.Id);
 
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
-            var apiClient = scope.ServiceProvider.GetRequiredService<IMockApiClient>();
+            var processor = scope.ServiceProvider.GetRequiredService<IOrderProcessor>();
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(_options.JobTimeoutMinutes), _timeProvider);
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(serviceStoppingToken, timeoutCts.Token);
-
-            _logger.LogInformation("Processing order {OrderId}", order.Id);
-
-            try
-            {
-                await repo.MarkStartedAsync(order.Id, linkedCts.Token);
-                await apiClient.ProcessOrderAsync(order, linkedCts.Token);
-                await repo.MarkCompletedAsync(order.Id, CancellationToken.None);
-            }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-            {
-                await repo.MarkTimeoutAsync(order.Id, CancellationToken.None);
-            }
-            catch (OperationCanceledException) when (serviceStoppingToken.IsCancellationRequested)
-            {
-                await repo.ResetToOpenAsync(order.Id, CancellationToken.None);
-            }
+            await processor.ProcessAsync(order, serviceStoppingToken);
         }
         catch (Exception ex)
         {
