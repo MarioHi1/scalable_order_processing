@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using ScalableOrderProcessing;
 using ScalableOrderProcessing.Repositories;
 using ScalableOrderProcessing.Services;
@@ -11,11 +12,20 @@ var connectionString = builder.Configuration.GetConnectionString("Postgres")
 builder.Services.AddNpgsqlDataSource(connectionString);
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderProcessor, OrderProcessor>();
-builder.Services.AddHttpClient<IMockApiClient, MockApiClient>(client =>
+
+builder.Services.AddOptions<MockApiOptions>()
+    .Bind(builder.Configuration.GetSection(MockApiOptions.SectionName))
+    .Validate(o => Uri.TryCreate(o.BaseAddress, UriKind.Absolute, out _), "MockApi:BaseAddress must be an absolute URL")
+    .Validate(o => !string.IsNullOrWhiteSpace(o.ApiKey),
+        "MockApi:ApiKey is missing, set it with: dotnet user-secrets set \"MockApi:ApiKey\" \"<key>\"")
+    .Validate(o => o.TimeoutSeconds > 0, "MockApi:TimeoutSeconds must be greater than 0")
+    .ValidateOnStart();
+builder.Services.AddHttpClient<IMockApiClient, MockApiClient>((services, client) =>
 {
-    client.BaseAddress = new Uri("https://mockapi-ms5j.onrender.com/");
-    client.DefaultRequestHeaders.Add("X-Api-Key", "56ef6b6aa58231ac727d5de50b912387");
-    client.Timeout = TimeSpan.FromSeconds(90);
+    var options = services.GetRequiredService<IOptions<MockApiOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseAddress);
+    client.DefaultRequestHeaders.Add("X-Api-Key", options.ApiKey);
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
 });
 
 builder.Services.AddOptions<WorkerOptions>()
